@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D City Car Simulator</title>
+    <style>
+        body { margin: 0; overflow: hidden; }
+        #info {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: white;
+            font-family: Arial, sans-serif;
+            font-size: 16px;
+        }
+    </style>
+</head>
+<body>
+    <div id="info">Use Arrow keys to drive, Space to brake</div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+        // Set up scene, camera, and renderer
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
+
+        // Create ground
+        const groundGeometry = new THREE.PlaneGeometry(1000, 1000);
+        const groundMaterial = new THREE.MeshPhongMaterial({ color: 0x1a1a1a, side: THREE.DoubleSide });
+        const ground = new THREE.Mesh(groundGeometry, groundMaterial);
+        ground.rotation.x = Math.PI / 2;
+        scene.add(ground);
+
+        // Create car
+        const carGroup = new THREE.Group();
+        
+        // Car body
+        const carBodyGeometry = new THREE.BoxGeometry(2, 0.5, 4);
+        const carBodyMaterial = new THREE.MeshPhongMaterial({ color: 0x3366cc });
+        const carBody = new THREE.Mesh(carBodyGeometry, carBodyMaterial);
+        carBody.position.y = 0.5;
+        carGroup.add(carBody);
+
+        // Car roof
+        const carRoofGeometry = new THREE.BoxGeometry(1.8, 0.5, 2);
+        const carRoofMaterial = new THREE.MeshPhongMaterial({ color: 0x3366cc });
+        const carRoof = new THREE.Mesh(carRoofGeometry, carRoofMaterial);
+        carRoof.position.y = 1;
+        carRoof.position.z = -0.5;
+        carGroup.add(carRoof);
+
+        // Wheels
+        const wheelGeometry = new THREE.CylinderGeometry(0.4, 0.4, 0.2, 32);
+        const wheelMaterial = new THREE.MeshPhongMaterial({ color: 0x333333 });
+        const wheelPositions = [
+            { x: -1, y: 0, z: 1.5 },
+            { x: 1, y: 0, z: 1.5 },
+            { x: -1, y: 0, z: -1.5 },
+            { x: 1, y: 0, z: -1.5 }
+        ];
+
+        wheelPositions.forEach(pos => {
+            const wheel = new THREE.Mesh(wheelGeometry, wheelMaterial);
+            wheel.position.set(pos.x, pos.y, pos.z);
+            wheel.rotation.z = Math.PI / 2;
+            carGroup.add(wheel);
+        });
+
+        scene.add(carGroup);
+
+        // Create city buildings
+        function createBuilding(x, z) {
+            const height = Math.random() * 20 + 10;
+            const geometry = new THREE.BoxGeometry(5, height, 5);
+            const material = new THREE.MeshPhongMaterial({ color: Math.random() * 0xffffff });
+            const building = new THREE.Mesh(geometry, material);
+            building.position.set(x, height / 2, z);
+            scene.add(building);
+        }
+
+        for (let i = 0; i < 100; i++) {
+            const x = Math.random() * 200 - 100;
+            const z = Math.random() * 200 - 100;
+            createBuilding(x, z);
+        }
+
+        // Set up lighting
+        const ambientLight = new THREE.AmbientLight(0x404040);
+        scene.add(ambientLight);
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        directionalLight.position.set(1, 1, 1);
+        scene.add(directionalLight);
+
+        // Set initial camera and car position
+        camera.position.set(0, 5, 10);
+        camera.lookAt(carGroup.position);
+
+        // Car physics variables
+        let speed = 0;
+        let acceleration = 0;
+        let steering = 0;
+        const maxSpeed = 0.5;
+        const maxReverseSpeed = -0.2;
+
+        // Keyboard controls
+        const keys = {};
+        document.addEventListener('keydown', (e) => keys[e.code] = true);
+        document.addEventListener('keyup', (e) => keys[e.code] = false);
+
+        function updateCar() {
+            // Accelerate
+            if (keys['ArrowUp']) {
+                acceleration = 0.002;
+            } else if (keys['ArrowDown']) {
+                acceleration = -0.002;
+            } else {
+                acceleration = 0;
+            }
+
+            // Steering
+            if (keys['ArrowLeft']) {
+                steering = 0.03;
+            } else if (keys['ArrowRight']) {
+                steering = -0.03;
+            } else {
+                steering = 0;
+            }
+
+            // Apply acceleration
+            speed += acceleration;
+            speed = Math.max(maxReverseSpeed, Math.min(maxSpeed, speed));
+
+            // Apply friction
+            speed *= 0.98;
+
+            // Apply steering
+            carGroup.rotation.y += steering * speed;
+
+            // Move car
+            carGroup.position.x += Math.sin(carGroup.rotation.y) * speed;
+            carGroup.position.z += Math.cos(carGroup.rotation.y) * speed;
+
+            // Brake
+            if (keys['Space']) {
+                speed *= 0.9;
+            }
+
+            // Update camera position
+            camera.position.x = carGroup.position.x - 10 * Math.sin(carGroup.rotation.y);
+            camera.position.z = carGroup.position.z - 10 * Math.cos(carGroup.rotation.y);
+            camera.position.y = 5;
+            camera.lookAt(carGroup.position);
+        }
+
+        // Animation loop
+        function animate() {
+            requestAnimationFrame(animate);
+            updateCar();
+            renderer.render(scene, camera);
+        }
+        animate();
+
+        // Handle window resizing
+        window.addEventListener('resize', onWindowResize, false);
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+    </script>
+</body>
+</html>
